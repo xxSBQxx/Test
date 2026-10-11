@@ -1,9 +1,47 @@
-# Qatar Offers — local extraction + hybrid categorization edition
+# Qatar Offers — local extraction + hybrid categorization + premium frontend
 
-A small static website plus a Python collector. GitHub Actions runs the
-collector every six hours and republishes the site with GitHub Pages. The
-project is kept portable so the same Python collector can later run on your
-own server.
+A static website plus a Python collector. GitHub Actions runs the collector
+every six hours and republishes the site with GitHub Pages. The project is
+kept portable so the same Python collector can later run on your own server.
+
+## The frontend (web/)
+
+`web/` is a multi-page static site. There is no separate server API — the
+pages read `web/offers.json` and `web/malls.json` directly, which is what
+`crawler/run.py` writes. That is "the backend" for this architecture.
+
+- `index.html` — hero, live search, categories, featured/trending/latest
+  rails, a filterable + sortable + paginated full browse grid, favorites,
+  and a device profile box.
+- `offer.html?id=…` — offer detail: price, promo code (with copy button),
+  expiry progress bar, terms note, confidence note, source link, share,
+  related offers, and `schema.org/Offer` JSON-LD for SEO.
+- `merchant.html` (no query) — merchant index; `merchant.html?name=…` — a
+  single merchant's profile and live offers.
+- `admin.html` — a lightweight passphrase-gated dashboard (passphrase
+  `qatar-offers-admin`, change it in `web/admin.html`) showing **real**
+  analytics computed from the current `offers.json`: live offer count,
+  needs-review count, offers-by-category/mall, AI-vs-rule classification
+  split, average confidence, offers expiring soon, the last run's fetch
+  errors, a full sortable offers table, and a "export flagged offers" CSV
+  download. This gate is a convenience for a static site, not a secure
+  backend login — anyone with the passphrase and the device can view it.
+- `assets/app.css` / `assets/app.js` — shared design system and app logic:
+  the 16-category taxonomy, English/Arabic (RTL) i18n, dark mode, search/
+  filter/sort/pagination, favorites + recently-viewed + device profile
+  (all `localStorage`, per-device — this static site has no multi-device
+  user-account backend), share (native share sheet or copy-link), and SEO
+  helpers.
+
+Offers are never shown as active past their `end_date`: `run.py` already
+excludes expired offers from `offers.json`, and the frontend re-checks the
+date client-side as a second safety net before rendering anything.
+
+All of this was verified with real browser automation (Playwright) against
+data produced by the actual crawler — desktop/mobile, English/Arabic, light/
+dark, search+filter+sort+pagination, favorites persistence, offer detail
+actions, merchant navigation, the admin dashboard and CSV export, empty and
+error states, mobile nav, and keyboard tab order.
 
 ## What's in the engine
 

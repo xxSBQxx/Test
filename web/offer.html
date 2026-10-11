@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offer — Qatar Offers</title>
+<meta name="description" content="Offer details on Qatar Offers.">
+<meta name="theme-color" content="#7A1430">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div id="header-slot"></div>
+<main id="main">
+  <div class="wrap" style="padding-top:20px">
+    <nav class="breadcrumb" id="crumb" aria-label="Breadcrumb"></nav>
+  </div>
+  <div class="wrap" id="content">
+    <div class="detail-grid">
+      <div class="skeleton" style="aspect-ratio:16/10;border-radius:18px" aria-hidden="true"></div>
+      <div class="skeleton" style="height:320px;border-radius:18px" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <section class="section" id="related-section" hidden>
+    <div class="wrap">
+      <div class="section-head"><div><h2 id="relatedHeading"></h2></div></div>
+      <div class="rail" id="relatedRail"></div>
+    </div>
+  </section>
+</main>
+<div id="footer-slot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function(){
+  const tr = QO.t();
+  QO.wireChrome("browse");
+
+  const id = QO.qs("id");
+  const content = document.getElementById("content");
+  const crumb = document.getElementById("crumb");
+
+  function renderCrumb(o){
+    crumb.innerHTML = `<a href="index.html">${tr.breadcrumb_home}</a><span>/</span>
+      <a href="index.html#browse">${tr.breadcrumb_browse}</a><span>/</span>
+      <a href="index.html#browse" data-cat="${QO.esc(o.category)}">${QO.esc(QO.categoryLabel(o.category))}</a><span>/</span>
+      <span>${QO.esc(o.store_name)}</span>`;
+  }
+
+  function render(o, all){
+    document.title = `${o.store_name} — ${QO.offerTitle(o)} | ${tr.app}`;
+    QO.setSEO({
+      title: `${o.store_name} — ${QO.offerTitle(o)} | ${tr.app}`,
+      description: (o.description || QO.offerTitle(o)).slice(0,160),
+      canonical: location.href.split("#")[0]
+    });
+    renderCrumb(o);
+    const d = QO.daysLeft(o.end_date);
+    const pct = (o.start_date && o.end_date) ? Math.max(0, Math.min(100, 100 - Math.round((d / Math.max(1,((new Date(o.end_date)-new Date(o.start_date))/86400000)))*100))) : null;
+    const fav = QO.Favorites.has(o.id);
+    const verified = !o.needs_review && (o.category_confidence==null||o.category_confidence>=0.5);
+
+    content.innerHTML = `
+      <div class="detail-grid">
+        <div>
+          <div class="detail-media">${o.image ? `<img src="${QO.esc(o.image)}" alt="${QO.esc(o.store_name+': '+QO.offerTitle(o))}">` : `<div class="placeholder">${QO.categoryIcon(o.category)}</div>`}</div>
+          ${o.products && o.products.length ? `<div class="filter-chips" style="margin-top:14px">${o.products.map(p=>`<span class="tag-chip">${QO.esc(p)}</span>`).join("")}</div>` : ""}
+          ${o.related_note || ""}
+        </div>
+        <div class="detail-panel">
+          <a class="store-link" href="merchant.html?name=${QO.slug(o.store_name)}">${QO.esc(o.store_name)}${o.mall_name?" · "+QO.esc(o.mall_name):""}</a>
+          <h1>${QO.esc(QO.offerTitle(o))}</h1>
+          <div class="filter-chips">
+            ${verified?`<span class="tag-chip" style="color:var(--good);border-color:var(--good)">${tr.verified}</span>`:""}
+            <span class="tag-chip">${QO.esc(QO.categoryLabel(o.category))}${o.subcategory?" · "+QO.esc(o.subcategory):""}</span>
+            ${(o.tags||[]).map(tg=>`<span class="tag-chip ${tg==='Banking Offer'?'bank':''}">${QO.esc(tg)}</span>`).join("")}
+            ${o.needs_review?`<span class="tag-chip review">${tr.review}</span>`:""}
+          </div>
+          ${o.discount_text ? `<p class="price-row"><span class="big">${QO.esc(o.discount_text)}</span></p>` : ""}
+          ${o.price ? `<p class="price-row">${tr.price}: <span class="big">${QO.esc(QO.fmtPrice(o.price))}</span></p>` : ""}
+          ${o.description ? `<p>${QO.esc(o.description)}</p>` : ""}
+          ${o.promo_code ? `<div class="promo-box"><div>${tr.promo_code}: <code>${QO.esc(o.promo_code)}</code></div><button type="button" id="copyPromo">${tr.copy}</button></div>` : ""}
+          ${o.end_date ? `<div>
+            <div class="expiry-bar"><i style="width:${pct==null?50:pct}%"></i></div>
+            <p class="offer-meta-row" style="padding:0">${o.start_date?`<span>${tr.starts}: ${QO.esc(o.start_date)}</span>`:""}<span>${tr.ends}: ${QO.esc(o.end_date)} ${d!=null?`(${d<=0?tr.today:d+" "+tr.days_left})`:""}</span></p>
+          </div>` : `<p class="offer-meta-row" style="padding:0">${tr.ends}: ${tr.no_end}</p>`}
+          <div class="action-row">
+            <button type="button" class="btn primary" id="favBtn" data-fav="${QO.esc(o.id)}" aria-pressed="${fav}">
+              <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" fill="${fav?'currentColor':'none'}" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7.5-4.6-10-9.2C.3 8 2 4.5 5.6 4a5 5 0 0 1 6.4 2.3A5 5 0 0 1 18.4 4C22 4.5 23.7 8 22 11.8 19.5 16.4 12 21 12 21Z"/></svg>
+              <span id="favLabel">${fav?tr.saved:tr.save}</span>
+            </button>
+            <button type="button" class="btn" id="shareBtn"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.2 10.6 7.6-4.2M8.2 13.4l7.6 4.2"/></svg>${tr.share}</button>
+            ${o.source_url ? `<a class="btn" href="${QO.esc(o.source_url)}" target="_blank" rel="noopener noreferrer">${tr.source}</a>` : ""}
+          </div>
+          ${o.has_terms ? `<div class="terms-box"><strong>${tr.terms}:</strong> ${tr.terms_note}</div>` : ""}
+          ${o.category_confidence!=null ? `<div class="confidence-note">${QO.iconSvg("sparkle","")}<span>${tr.confidence_note(Math.round(o.category_confidence*100))}</span></div>` : ""}
+        </div>
+      </div>`;
+
+    document.getElementById("favBtn").addEventListener("click", () => {
+      const nowOn = QO.Favorites.toggle(o.id);
+      document.getElementById("favBtn").setAttribute("aria-pressed", String(nowOn));
+      document.getElementById("favBtn").querySelector("svg").setAttribute("fill", nowOn ? "currentColor" : "none");
+      document.getElementById("favLabel").textContent = nowOn ? tr.saved : tr.save;
+      QO.updateFavCount();
+    });
+    document.getElementById("shareBtn").addEventListener("click", () => QO.shareOffer(o));
+    const copyBtn = document.getElementById("copyPromo");
+    if (copyBtn) copyBtn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(o.promo_code); QO.toast(tr.copied); }
+      catch(e){ QO.toast(o.promo_code); }
+    });
+
+    injectSchema(o);
+    renderRelated(o, all);
+  }
+
+  function injectSchema(o){
+    const data = {
+      "@context": "https://schema.org",
+      "@type": "Offer",
+      "name": QO.offerTitle(o),
+      "description": o.description || undefined,
+      "category": o.category,
+      "url": location.href.split("#")[0],
+      "seller": { "@type": "Organization", "name": o.store_name },
+      "priceCurrency": o.price ? "QAR" : undefined,
+      "price": o.price || undefined,
+      "validThrough": o.end_date || undefined,
+    };
+    Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+    QO.injectJsonLd(data);
+  }
+
+  function renderRelated(o, all){
+    const related = all.filter(x => x.id !== o.id && (x.store_name === o.store_name || x.category === o.category)).slice(0, 8);
+    const sec = document.getElementById("related-section");
+    if (!related.length) { sec.hidden = true; return; }
+    sec.hidden = false;
+    document.getElementById("relatedHeading").textContent = tr.related;
+    document.getElementById("relatedRail").innerHTML = related.map(QO.offerCard).join("");
+    QO.wireFavButtons(document.getElementById("relatedRail"));
+  }
+
+  (async function init(){
+    if (!id) { content.innerHTML = QO.emptyState(tr.empty_title, tr.empty_body); return; }
+    let DATA;
+    try { DATA = await QO.loadData(); }
+    catch (e) { content.innerHTML = QO.errorState('onclick="location.reload()"'); return; }
+    const offer = DATA.offers.find(o => o.id === id);
+    if (!offer) { content.innerHTML = QO.emptyState(tr.empty_title, tr.empty_body); return; }
+    QO.Recents.add(offer.id);
+    render(offer, DATA.offers);
+  })();
+})();
+</script>
+</body>
+</html>

@@ -126,9 +126,11 @@ def normalize(o, today):
     url = o.get("source_url")
     products = o.get("products") if isinstance(o.get("products"), list) else []
     tags = o.get("tags") if isinstance(o.get("tags"), list) else []
+    image = o.get("image")
     return {"store_name": store, "title": title, "title_ar": s300(o.get("title_ar")),
             "description": s300(o.get("description")), "discount_text": s300(o.get("discount_text")),
             "promo_code": s300(o.get("promo_code")), "price": s300(str(o["price"])) if o.get("price") else None,
+            "image": image if isinstance(image, str) and re.match(r"https?://", image) else None,
             "products": [s300(p) for p in products if s300(p)][:5],
             "has_terms": bool(o.get("has_terms")),
             "category": o.get("category") if o.get("category") in CATS else "Other",
@@ -185,6 +187,7 @@ def migrate_state(st):
         for o in st["offers"].values():
             o.setdefault("promo_code", None)
             o.setdefault("price", None)
+            o.setdefault("image", None)
             o.setdefault("products", [])
             o.setdefault("has_terms", False)
             o.setdefault("subcategory", "Uncategorized")
@@ -250,6 +253,8 @@ def main(root=ROOT):
                                               cache=cache, ai_budget=ai_budget)
                     if offers is None:
                         continue                              # extraction failed: retry next run
+                    for o in offers:
+                        o["image"] = img_url   # the real banner the offer was read from
                     st["images"][img_url] = {"offer_ids": add_offers(st, mall, offers, url, pg.get("branch"), T)}
                     new_images += 1
                     time.sleep(SLEEP)
@@ -277,10 +282,10 @@ def main(root=ROOT):
         if ended or stale:
             del st["offers"][i]
 
-    pub = ["id", "store_name", "mall_name", "title", "title_ar", "description", "discount_text",
-           "promo_code", "price", "products", "has_terms",
-           "category", "subcategory", "tags", "category_confidence", "needs_review",
-           "start_date", "end_date", "source_url", "seen_sources", "language", "origin"]
+    pub = ["id", "mall_id", "store_name", "mall_name", "title", "title_ar", "description", "discount_text",
+           "promo_code", "price", "image", "products", "has_terms",
+           "category", "subcategory", "tags", "category_confidence", "needs_review", "category_method",
+           "start_date", "end_date", "first_seen", "source_url", "seen_sources", "language", "origin"]
     live = sorted(st["offers"].values(), key=lambda o: (o.get("end_date") or "9999", o["store_name"]))
     jsave(root / "web/offers.json", {
         "updated": now, "timezone": "Asia/Qatar", "status": status,

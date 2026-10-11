@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merchants — Qatar Offers</title>
+<meta name="description" content="Browse every merchant with a live offer on Qatar Offers.">
+<meta name="theme-color" content="#7A1430">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div id="header-slot"></div>
+<main id="main">
+  <div class="wrap">
+    <nav class="breadcrumb" id="crumb" aria-label="Breadcrumb"></nav>
+  </div>
+  <div id="merchantHero"></div>
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head" id="listHead"><div><h2 id="listHeading"></h2><p id="listSub"></p></div></div>
+      <div id="merchantBody"><div class="grid" id="skelGrid"></div></div>
+      <nav class="pagination" id="pagination" aria-label="Pagination"></nav>
+    </div>
+  </section>
+</main>
+<div id="footer-slot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function(){
+  const tr = QO.t();
+  QO.wireChrome("merchants");
+  document.getElementById("skelGrid").innerHTML = QO.skeletonCards(6);
+
+  const name = QO.qs("name");
+  let page = 1;
+  const PER_PAGE = 24;
+
+  function renderMerchantsIndex(offers){
+    QO.setSEO({ title: tr.merchants_title + " | " + tr.app, description: tr.merchants_sub });
+    document.getElementById("crumb").innerHTML = `<a href="index.html">${tr.breadcrumb_home}</a><span>/</span><span>${tr.merchants_title}</span>`;
+    document.getElementById("listHeading").textContent = tr.merchants_title;
+    document.getElementById("listSub").textContent = tr.merchants_sub;
+    const byStore = {};
+    offers.forEach(o => { (byStore[o.store_name] = byStore[o.store_name] || []).push(o); });
+    const entries = Object.entries(byStore).sort((a,b) => b[1].length - a[1].length);
+    const state = QO.paginate(entries, page, PER_PAGE);
+    page = state.page;
+    document.getElementById("merchantBody").innerHTML = entries.length ? `<div class="grid">` + state.slice.map(([store, list]) => `
+      <a class="cat-tile" href="merchant.html?name=${QO.slug(store)}">
+        <b>${QO.esc(store)}</b>
+        <span>${tr.merchant_offers(list.length)}</span>
+      </a>`).join("") + `</div>` : QO.emptyState(tr.empty_title, tr.empty_body);
+    QO.renderPagination(document.getElementById("pagination"), state, (p) => { page = p; renderMerchantsIndex(offers); window.scrollTo({top:0,behavior:"smooth"}); });
+  }
+
+  function renderMerchantProfile(storeName, offers){
+    const list = offers.filter(o => o.store_name === storeName);
+    QO.setSEO({ title: `${storeName} | ${tr.app}`, description: `${tr.merchant_offers(list.length)} — ${storeName}` });
+    document.getElementById("crumb").innerHTML = `<a href="index.html">${tr.breadcrumb_home}</a><span>/</span>
+      <a href="merchant.html">${tr.merchants_title}</a><span>/</span><span>${QO.esc(storeName)}</span>`;
+    const initials = storeName.trim().slice(0,2).toUpperCase();
+    const malls = [...new Set(list.map(o=>o.mall_name).filter(Boolean))];
+    const cats = [...new Set(list.map(o=>o.category))];
+    document.getElementById("merchantHero").innerHTML = `<div class="wrap merchant-hero">
+      <div class="merchant-avatar" aria-hidden="true">${QO.esc(initials)}</div>
+      <div><h1>${QO.esc(storeName)}</h1><p style="color:var(--mute);margin:4px 0 0">${tr.merchant_offers(list.length)}${malls.length?" · "+malls.map(QO.esc).join(", "):""}</p></div>
+    </div>`;
+    document.getElementById("listHead").hidden = true;
+    if (!list.length) {
+      document.getElementById("merchantBody").innerHTML = QO.emptyState(tr.empty_title, tr.empty_body);
+      return;
+    }
+    const state = QO.paginate(list, page, PER_PAGE);
+    page = state.page;
+    document.getElementById("merchantBody").innerHTML = `<div class="grid">${state.slice.map(QO.offerCard).join("")}</div>`;
+    QO.wireFavButtons(document.getElementById("merchantBody"));
+    QO.renderPagination(document.getElementById("pagination"), state, (p) => { page = p; renderMerchantProfile(storeName, offers); window.scrollTo({top:0,behavior:"smooth"}); });
+  }
+
+  (async function init(){
+    let DATA;
+    try { DATA = await QO.loadData(); }
+    catch (e) { document.getElementById("merchantBody").innerHTML = QO.errorState('onclick="location.reload()"'); return; }
+    if (name) renderMerchantProfile(QO.unslug(name), DATA.offers);
+    else renderMerchantsIndex(DATA.offers);
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,11 @@
 // Network first (always fresh offers), saved copy when offline.
-const C = "qo-v1";
+const C = "qo-v2";
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(C).then((c) => c.addAll(["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"])));
+  e.waitUntil(caches.open(C).then((c) => c.addAll([
+    "./", "index.html", "offer.html", "merchant.html", "admin.html",
+    "assets/app.css", "assets/app.js",
+    "manifest.webmanifest", "icon-192.png", "icon-512.png"
+  ])));
   self.skipWaiting();
 });
 self.addEventListener("activate", (e) => {

@@ -106,15 +106,33 @@ def _store(text, fallback):
                 return line
     return fallback
 
+def _looks_like_heading(line):
+    # A short, title-ish line with no offer/discount/promo/price language of
+    # its own is likely a new store/section heading rather than part of the
+    # current offer's supporting detail (code, price, dates).
+    if PROMO_CODE.search(line) or PRICE.search(line) or any(p.search(line) for p in DATE_PATTERNS):
+        return False
+    return (2 <= len(line) <= 48 and not OFFER_WORDS.search(line) and not DISCOUNT.search(line)
+            and re.match(r"^[A-Z0-9]", line))
+
 def _candidate_chunks(text):
     # Web pages often flatten their text. Split around newlines and common separators,
-    # then combine nearby lines so a store name and its offer remain together.
+    # then combine nearby lines so a store name and its offer remain together --
+    # but stop at the next heading-like line in either direction so two
+    # back-to-back store blocks never get merged into one offer.
     lines = [re.sub(r"\s+", " ", x).strip(" \t-•|") for x in text.splitlines()]
     lines = [x for x in lines if x]
     chunks = []
     for i, line in enumerate(lines):
         if OFFER_WORDS.search(line) or DISCOUNT.search(line):
-            chunk = " ".join(lines[max(0, i-2):min(len(lines), i+3)])
+            start = i
+            if start > 0 and _looks_like_heading(lines[start - 1]):
+                start -= 1  # include the immediate preceding store/heading line
+            end = i + 1
+            limit = min(len(lines), i + 3)
+            while end < limit and not (end > i + 1 and _looks_like_heading(lines[end])):
+                end += 1
+            chunk = " ".join(lines[start:end])
             if chunk not in chunks:
                 chunks.append(chunk)
     if not chunks and (OFFER_WORDS.search(text) or DISCOUNT.search(text)):

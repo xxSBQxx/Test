@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin dashboard — Qatar Offers</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#7A1430">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div id="header-slot"></div>
+<main id="main">
+  <div class="wrap" id="gateWrap"></div>
+  <div class="wrap" id="dashWrap" hidden></div>
+</main>
+<div id="footer-slot"></div>
+<script src="assets/app.js"></script>
+<script>
+(function(){
+  const tr = QO.t();
+  QO.wireChrome("admin");
+  QO.setSEO({ title: tr.admin_title + " | " + tr.app, description: tr.admin_sub });
+
+  const SESSION_KEY = "qo_admin_unlocked";
+  // This is a convenience gate for a static, backend-less site — it keeps the
+  // dashboard out of casual view, NOT a secure login. The passphrase lives in
+  // this public JS file, like everything else shipped to a static site.
+  const PASSPHRASE = "qatar-offers-admin";
+
+  function showGate(wrong){
+    document.getElementById("dashWrap").hidden = true;
+    const gate = document.getElementById("gateWrap");
+    gate.hidden = false;
+    gate.innerHTML = `<div class="admin-gate">
+      <h1>${tr.admin_gate_title}</h1>
+      <p style="color:var(--mute)">${tr.admin_gate_body}</p>
+      <form id="gateForm">
+        <label class="visually-hidden" for="pass">${tr.admin_gate_ph}</label>
+        <input id="pass" type="password" placeholder="${tr.admin_gate_ph}" autocomplete="off">
+        <button class="btn primary" type="submit" style="width:100%; justify-content:center">${tr.admin_gate_btn}</button>
+        ${wrong ? `<p style="color:var(--soon); margin-top:10px">${tr.admin_gate_wrong}</p>` : ""}
+      </form>
+    </div>`;
+    document.getElementById("gateForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (document.getElementById("pass").value === PASSPHRASE) {
+        sessionStorage.setItem(SESSION_KEY, "1");
+        boot();
+      } else showGate(true);
+    });
+  }
+
+  function pct(n){ return Math.round(n*100); }
+
+  function computeStats(DATA){
+    const offers = DATA.offers;
+    const byCat = {}, byMall = {}, byMethod = { rule: 0, ai: 0 };
+    let needsReview = 0, confSum = 0, confN = 0, expiring = 0, hasPromo = 0;
+    const today = QO.qatarToday();
+    offers.forEach(o => {
+      byCat[o.category] = (byCat[o.category]||0)+1;
+      if (o.mall_name) byMall[o.mall_name] = (byMall[o.mall_name]||0)+1;
+      byMethod[o.category_method === "ai" ? "ai" : "rule"]++;
+      if (o.needs_review) needsReview++;
+      if (o.category_confidence != null) { confSum += o.category_confidence; confN++; }
+      if (o.promo_code) hasPromo++;
+      const d = QO.daysLeft(o.end_date);
+      if (d != null && d <= 3) expiring++;
+    });
+    return {
+      total: offers.length, byCat, byMall, byMethod, needsReview,
+      avgConf: confN ? confSum/confN : null, expiring, hasPromo,
+      mallsConfigured: DATA.malls.length,
+      errors: DATA.meta.errors || [], updated: DATA.meta.updated, status: DATA.meta.status || [],
+    };
+  }
+
+  function barList(obj, total, labelFn){
+    const entries = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    if (!entries.length) return `<p style="color:var(--mute)">—</p>`;
+    return `<div class="bar-list">` + entries.map(([k,v]) => `
+      <div class="bar-row">
+        <span>${QO.esc(labelFn ? labelFn(k) : k)}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:${total?Math.round(v/total*100):0}%"></span></span>
+        <span>${v}</span>
+      </div>`).join("") + `</div>`;
+  }
+
+  function csvEscape(v){ const s = String(v==null?"":v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }
+  function exportFlaggedCSV(offers){
+    const flagged = offers.filter(o => o.needs_review);
+    const cols = ["id","store_name","mall_name","title","category","subcategory","category_confidence","category_method","end_date","source_url"];
+    const rows = [cols.join(",")].concat(flagged.map(o => cols.map(c => csvEscape(o[c])).join(",")));
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "flagged-offers.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function renderDash(DATA){
+    const s = computeStats(DATA);
+    const wrap = document.getElementById("dashWrap");
+    wrap.hidden = false;
+    document.getElementById("gateWrap").hidden = true;
+
+    const kpis = [
+      [tr.kpi_live, s.total],
+      [tr.kpi_review, s.needsReview],
+      [tr.kpi_malls, s.mallsConfigured],
+      [tr.kpi_errors, s.errors.length],
+      [tr.kpi_expiring, s.expiring],
+      [tr.kpi_ai, s.byMethod.ai],
+      [tr.kpi_conf, s.avgConf!=null ? pct(s.avgConf)+"%" : "—"],
+    ];
+
+    const rows = DATA.offers.slice().sort((a,b)=>(a.needs_review===b.needs_review)?0:(a.needs_review?-1:1))
+      .map(o => `<tr>
+        <td><a href="offer.html?id=${QO.slug(o.id)}">${QO.esc(o.title)}</a></td>
+        <td>${QO.esc(o.store_name)}</td>
+        <td>${QO.esc(o.mall_name||"—")}</td>
+        <td>${QO.esc(QO.categoryLabel(o.category))}</td>
+        <td>${o.category_confidence!=null?pct(o.category_confidence)+"%":"—"} <span style="color:var(--mute);font-size:.75rem">(${QO.esc(o.category_method||"rule")})</span></td>
+        <td>${QO.esc(o.end_date||tr.no_end)}</td>
+        <td><span class="status-dot ${o.needs_review?'review':'ok'}"></span>${o.needs_review?tr.review:tr.verified}</td>
+      </tr>`).join("");
+
+    wrap.innerHTML = `
+      <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:26px 0 6px">
+        <div><h1>${tr.admin_title}</h1><p style="color:var(--mute)">${tr.admin_sub} · ${tr.updated}: ${QO.esc(s.updated||"—")}</p></div>
+        <button type="button" class="pill-btn" id="lockBtn">${tr.admin_logout}</button>
+      </div>
+      <div class="note-banner">${tr.admin_gate_body}</div>
+      <div class="stat-grid">${kpis.map(([l,v]) => `<div class="stat-card"><b>${QO.esc(v)}</b><span>${QO.esc(l)}</span></div>`).join("")}</div>
+
+      <div class="detail-grid" style="align-items:stretch; margin-bottom:28px">
+        <div class="detail-panel">
+          <h3 style="margin-bottom:14px">${tr.by_category}</h3>
+          ${barList(s.byCat, s.total, c => QO.categoryLabel(c))}
+        </div>
+        <div class="detail-panel">
+          <h3 style="margin-bottom:14px">${tr.by_mall}</h3>
+          ${barList(s.byMall, s.total)}
+        </div>
+      </div>
+
+      <div class="detail-panel" style="margin-bottom:28px">
+        <h3 style="margin-bottom:14px">${tr.recent_errors}</h3>
+        ${s.errors.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Mall</th><th>URL</th><th>Error</th></tr></thead><tbody>
+          ${s.errors.map(e => `<tr><td>${QO.esc(e.mall)}</td><td style="max-width:260px;overflow-wrap:anywhere">${QO.esc(e.url)}</td><td>${QO.esc(e.error)}</td></tr>`).join("")}
+        </tbody></table></div>` : `<p style="color:var(--mute)">${tr.no_errors}</p>`}
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px">
+        <h3>${tr.all_offers_table}</h3>
+        <button type="button" class="pill-btn" id="exportCsv">${tr.export_csv}</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>${tr.th_offer}</th><th>${tr.th_store}</th><th>${tr.th_mall}</th><th>${tr.th_cat}</th><th>${tr.th_conf}</th><th>${tr.th_ends}</th><th>${tr.th_status}</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="7">${tr.empty_title}</td></tr>`}</tbody>
+        </table>
+      </div>
+      <div style="height:40px"></div>
+    `;
+    document.getElementById("lockBtn").addEventListener("click", () => { sessionStorage.removeItem(SESSION_KEY); showGate(false); });
+    document.getElementById("exportCsv").addEventListener("click", () => exportFlaggedCSV(DATA.offers));
+  }
+
+  async function boot(){
+    document.getElementById("gateWrap").hidden = true;
+    document.getElementById("dashWrap").hidden = false;
+    document.getElementById("dashWrap").innerHTML = `<div class="grid" style="margin-top:26px">${QO.skeletonCards(6)}</div>`;
+    try {
+      const DATA = await QO.loadData();
+      renderDash(DATA);
+    } catch (e) {
+      document.getElementById("dashWrap").innerHTML = QO.errorState('onclick="location.reload()"');
+    }
+  }
+
+  if (sessionStorage.getItem(SESSION_KEY) === "1") boot();
+  else showGate(false);
+})();
+</script>
+</body>
+</html>
