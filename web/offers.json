@@ -1,10 +1,10 @@
 {
- "updated": "2026-10-11 12:21 AST",
+ "updated": "2026-10-11 12:23 AST",
  "timezone": "Asia/Qatar",
  "status": [
   {
    "id": "mall-of-qatar",
-   "checked_at": "2026-10-11 12:21 AST",
+   "checked_at": "2026-10-11 12:23 AST",
    "sources": [
     {
      "title": "www.mallofqatar.com.qa/en/events/qatar-mega-sale",
@@ -18,7 +18,7 @@
   },
   {
    "id": "city-center",
-   "checked_at": "2026-10-11 12:21 AST",
+   "checked_at": "2026-10-11 12:23 AST",
    "sources": [
     {
      "title": "citycenterdoha.com/brands-for-less/",
@@ -28,7 +28,7 @@
   },
   {
    "id": "ezdan-mall",
-   "checked_at": "2026-10-11 12:21 AST",
+   "checked_at": "2026-10-11 12:23 AST",
    "sources": [
     {
      "title": "gharrafa.ezdanmall.qa/promotions",
